@@ -1,3 +1,5 @@
+const sha1 = require('sha1')
+
 /**
  *  1) client send request to get unique key - clear
  *  2) server generate & send unique key - clear
@@ -99,7 +101,17 @@ class Client {
     }
 
     generateUniqueKey() {
-        return 'dorian09876543'
+        // key : a17d-d8fg-1b3n-145
+        const templateRegex = /\w{4}/g
+        const clearKey = sha1(`${this.ip}@${Date.now()}`)
+        const template = clearKey.match(templateRegex)
+        if (template.length >= 3) {
+            const uniqueKey = template.slice(0, 3).join('-')
+            const verificationCode = uniqueKey.charCodeAt(0) + uniqueKey.charCodeAt(1)
+            return `${uniqueKey}-${verificationCode}`
+        } else {
+            console.log('error generateUniqueKey')
+        }
     }
 
     generateToken() {

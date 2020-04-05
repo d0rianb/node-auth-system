@@ -10,7 +10,10 @@ class Auth {
                 // Receive serverUniqueKey
                 if (res.uniqueKey && this.isValidKey(res.uniqueKey)) {
                     this.serverUniqueKey = res.uniqueKey
+                    console.log('Receive valid uniqueKey :', this.serverUniqueKey)
                     return true
+                } else {
+                    console.log('Error with unique key')
                 }
             })
             .then(() => {
@@ -49,7 +52,11 @@ class Auth {
     }
 
     static isValidKey(key) {
-        return true
+        const templateRegex = /(\w{4}\-){3}\d+/gi
+        const matchTemplate = key.match(templateRegex).length > 0
+        const parts = key.split('-')
+        const validKey = parts.length === 4 && (parts[0].charCodeAt(0) + parts[0].charCodeAt(1) == parts[3])
+        return matchTemplate && validKey
     }
 
     static generatePrivateKey() {
