@@ -26,9 +26,10 @@ class Auth {
             })
             .then(res => {
                 if (res.success && res.accessToken) {
-                    this.accessToken = res.accessToken
                     this.isAuthentified = true
-                    console.log(this.decode(this.accessToken, this.privateKey))
+                    this.accessToken = this.decode(res.accessToken, this.privateKey)
+                    this.accessTokenInfo = JSON.parse(this.decode(this.accessToken, this.privateKey))
+                    console.log(this.accessToken, this.accessTokenInfo)
                 } else {
                     console.log(res)
                 }

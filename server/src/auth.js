@@ -77,11 +77,10 @@ class AuthClient {
                 break;
             case 'SendPrivateKey':
                 this.privateKey = req.body.encode ? this.decode(req.body.privateKey, this.uniqueKey) : req.body.privateKey
-                console.log(this.privateKey)
                 res.json({
                     message: 'Authentification success',
                     success: true,
-                    accessToken: this.generateToken()
+                    accessToken: this.encode(this.generateToken(), this.privateKey)
                 })
                 this.isAuthentified = true
                 break;
@@ -107,8 +106,15 @@ class AuthClient {
     }
 
     generateToken() {
-        const token = this.encode('token', this.privateKey)
-        return token
+        const tokenDuration = 1 * 3600 * 100 // ms --> 1h
+        const token = JSON.stringify({
+            scope: 'all',
+            clientPrivate: this.privateKey,
+            duration: tokenDuration,
+            expireDate: Date.now() + tokenDuration
+        })
+        const tokenEncode = this.encode(token, this.privateKey)
+        return tokenEncode
     }
 
     encode(text, key) {
