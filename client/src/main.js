@@ -27,12 +27,12 @@ class Auth {
             .then(res => {
                 if (res.success && res.accessToken) {
                     this.accessToken = res.accessToken
-                    console.log(this.accessToken)
+                    this.isAuthentified = true
+                    console.log(this.decode(this.accessToken, this.privateKey))
                 } else {
                     console.log(res)
                 }
             })
-
     }
 
     static async request(reqName, params) {
@@ -48,7 +48,29 @@ class Auth {
     }
 
     static encode(text, key) {
-        return text + ' encoded with ' + key
+        if (key.length < 16) {
+            console.log(`Encode error: key ${key} is too short`)
+            key += new Array(16 - key.length).fill(0).join('')
+        }
+        let byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
+        const textBytes = aesjs.utils.utf8.toBytes(text)
+        const aesCtr = new aesjs.ModeOfOperation.ctr(byteKey, new aesjs.Counter(5))
+        const encryptedBytes = aesCtr.encrypt(textBytes)
+        const encryptedText = aesjs.utils.hex.fromBytes(encryptedBytes)
+        return encryptedText
+    }
+
+    static decode(encodeText, key) {
+        if (key.length < 16) {
+            console.log(`Decode error: key ${key} is too short`)
+            key += new Array(16 - key.length).fill(0).join('')
+        }
+        let byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
+        const encryptedBytes = aesjs.utils.hex.toBytes(encodeText)
+        const aesCtr = new aesjs.ModeOfOperation.ctr(byteKey, new aesjs.Counter(5))
+        const decryptedBytes = aesCtr.decrypt(encryptedBytes)
+        const decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes)
+        return decryptedText
     }
 
     static isValidKey(key) {
@@ -60,7 +82,8 @@ class Auth {
     }
 
     static generatePrivateKey() {
-        return 'aenor12345'
+        // Must be at least 16 characters long
+        return 'aenor12347890'
     }
 
 }

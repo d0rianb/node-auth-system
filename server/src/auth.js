@@ -1,4 +1,5 @@
 const sha1 = require('sha1')
+const aesjs = require('aes-js')
 
 /**
  *  1) client send request to get unique key - clear
@@ -15,28 +16,17 @@ const sha1 = require('sha1')
  *  3) SendInformations
  */
 
-const message = {
-    header: {
-        // some headers
-    },
-    body: {
-        isCrypted: true,
-        request: 'RequestUniqueKey',
-        content: ''
-    }
-}
-
 let clients = []
 
 class AuthSystem {
     static handdleRoute(req, res, next) {
         const clientIP = req.header('x-forwarded-for') || req.connection.remoteAddress
 
-        if (Client.exist(clients, clientIP)) {
-            let client = Client.get(clients, clientIP)
+        if (AuthClient.exist(clients, clientIP)) {
+            let client = AuthClient.get(clients, clientIP)
             client.handdleRequest(req, res, next)
         } else {
-            let client = new Client(req)
+            let client = new AuthClient(req)
             client.handdleRequest(req, res, next)
             clients.push(client)
         }
@@ -56,13 +46,13 @@ class AuthSystem {
     }
 }
 
-class Client {
+class AuthClient {
     constructor(req) {
         this.clientReq = req
         this.ip = req.header('x-forwarded-for') || req.connection.remoteAddress
         this.uniqueKey = this.generateUniqueKey()
         this.privateKey = ''
-        this.authenticate = false
+        this.isAuthentified = false
     }
 
     static get(clientsList, ip) {
@@ -86,12 +76,14 @@ class Client {
                 res.send({ uniqueKey: this.uniqueKey })
                 break;
             case 'SendPrivateKey':
+                this.privateKey = req.body.encode ? this.decode(req.body.privateKey, this.uniqueKey) : req.body.privateKey
+                console.log(this.privateKey)
                 res.json({
                     message: 'Authentification success',
                     success: true,
                     accessToken: this.generateToken()
                 })
-                this.authenticate = true
+                this.isAuthentified = true
                 break;
             default:
                 console.log(request)
@@ -115,12 +107,39 @@ class Client {
     }
 
     generateToken() {
-        return 'CustomToken id expire | encode ' + this.privateKey
+        const token = this.encode('token', this.privateKey)
+        return token
+    }
+
+    encode(text, key) {
+        if (key.length < 16) {
+            console.log(`Encode error: key ${key} is too short`)
+            key += new Array(16 - key.length).fill(0).join('')
+        }
+        let byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
+        const textBytes = aesjs.utils.utf8.toBytes(text)
+        const aesCtr = new aesjs.ModeOfOperation.ctr(byteKey, new aesjs.Counter(5))
+        const encryptedBytes = aesCtr.encrypt(textBytes)
+        const encryptedText = aesjs.utils.hex.fromBytes(encryptedBytes)
+        return encryptedText
+    }
+
+    decode(encodeText, key) {
+        if (key.length < 16) {
+            console.log(`Decode error: key ${key} is too short`)
+            key += new Array(16 - key.length).fill(0).join('')
+        }
+        let byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
+        const encryptedBytes = aesjs.utils.hex.toBytes(encodeText)
+        const aesCtr = new aesjs.ModeOfOperation.ctr(byteKey, new aesjs.Counter(5))
+        const decryptedBytes = aesCtr.decrypt(encryptedBytes)
+        const decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes)
+        return decryptedText
     }
 
 }
 
 module.exports = {
     AuthSystem,
-    Client
+    AuthClient
 }
