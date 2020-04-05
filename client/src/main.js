@@ -83,7 +83,8 @@ class Auth {
 
     static generatePrivateKey() {
         // Must be at least 16 characters long
-        return 'aenor12347890'
+        const privateKey = this.encode(this.encode(`${window.origin}&${Date.now()}`, this.serverUniqueKey), this.serverUniqueKey)
+        return privateKey
     }
 
 }
