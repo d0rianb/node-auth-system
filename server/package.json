@@ -9,10 +9,10 @@
     "author": "Dorian Beauchesne",
     "license": "MIT",
     "dependencies": {
+        "@dorianb/logger-js": "^0.5.2",
         "aes-js": "^3.1.2",
         "body-parser": "^1.19.0",
         "cors": "^2.8.5",
-        "crypto": "^1.0.1",
         "express": "^4.17.1",
         "sha1": "^1.1.1"
     },

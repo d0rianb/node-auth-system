@@ -1,5 +1,6 @@
 const sha1 = require('sha1')
 const aesjs = require('aes-js')
+const Logger = require('@dorianb/logger-js')
 
 /**
  *  1) client send request to get unique key - clear
@@ -53,6 +54,7 @@ class AuthClient {
         this.uniqueKey = this.generateUniqueKey()
         this.privateKey = ''
         this.isAuthentified = false
+        Logger.setOptions({ filename: 'auth.log' })
     }
 
     static get(clientsList, ip) {
@@ -67,7 +69,7 @@ class AuthClient {
         const request = req.body.request
 
         if (!request) {
-            console.log('error: no request')
+            Logger.error('Bad query : no request')
             res.send({ error: 'Bad query : no request' })
         }
 
@@ -101,7 +103,7 @@ class AuthClient {
             const verificationCode = uniqueKey.charCodeAt(0) + uniqueKey.charCodeAt(1)
             return `${uniqueKey}-${verificationCode}`
         } else {
-            console.log('error generateUniqueKey')
+            Logger.error('error generateUniqueKey')
         }
     }
 
@@ -119,7 +121,7 @@ class AuthClient {
 
     encode(text, key) {
         if (key.length < 16) {
-            console.log(`Encode error: key ${key} is too short`)
+            Logger.warn(`Encode error: key ${key} is too short`)
             key += new Array(16 - key.length).fill(0).join('')
         }
         let byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
@@ -132,10 +134,10 @@ class AuthClient {
 
     decode(encodeText, key) {
         if (key.length < 16) {
-            console.log(`Decode error: key ${key} is too short`)
+            Logger.warn(`Decode error: key ${key} is too short`)
             key += new Array(16 - key.length).fill(0).join('')
         }
-        let byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
+        const byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
         const encryptedBytes = aesjs.utils.hex.toBytes(encodeText)
         const aesCtr = new aesjs.ModeOfOperation.ctr(byteKey, new aesjs.Counter(5))
         const decryptedBytes = aesCtr.decrypt(encryptedBytes)
