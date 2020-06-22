@@ -1,6 +1,6 @@
 {
     "name": "server-auth-system",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "description": "A Server Side authentification system",
     "main": "app.js",
     "scripts": {

@@ -82,7 +82,7 @@ class Auth {
         return matchTemplate && validKey
     }
 
-    static generatePrivateKey() {
+    generatePrivateKey() {
         // Must be at least 16 characters long
         const privateKey = this.encode(this.encode(`${window.origin}&${Date.now()}`, this.serverUniqueKey), this.serverUniqueKey)
         return privateKey

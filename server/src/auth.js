@@ -106,7 +106,7 @@ class AuthClient {
     }
 
     generateToken() {
-        const tokenDuration = 1 * 3600 * 100 // ms --> 1h
+        const tokenDuration = 1 * 3600 * 1000 // ms --> 1h
         const token = JSON.stringify({
             scope: 'all',
             clientPrivate: this.privateKey,
