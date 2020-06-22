@@ -1,6 +1,6 @@
 # Node authentification system
 
-`js-auth-system` is a npm logger library for NodeJS
+`node-auth-system` is a npm logger library for NodeJS
 
 This project is part of the [vener.fr](http://www.vener.fr) project, to handle authentification of the server ([express](https://www.expressjs.com)).
 
