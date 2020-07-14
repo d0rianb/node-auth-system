@@ -1,7 +1,12 @@
 const SERVER_URL = '127.0.0.1'
-const PORT = 8000
+const PORT = 8081
 
 const AUTH_URL = `http://${SERVER_URL}:${PORT}/auth`
+
+// TODO:
+//  - Better library style API :
+//      - Getter & setter
+//      - jsdoc ?
 
 class Auth {
     static async authenticate() {
@@ -18,9 +23,9 @@ class Auth {
             })
             .then(() => {
                 // Send privateKey
-                this.privateKey = this.generatePrivateKey()
+                this.privateKey = Auth.generatePrivateKey()
                 return this.request('SendPrivateKey', {
-                    encode: 'uniqueKey',
+                    encode: 'true',
                     privateKey: this.encode(this.privateKey, this.serverUniqueKey)
                 })
             })
@@ -29,11 +34,24 @@ class Auth {
                     this.isAuthentified = true
                     this.accessToken = this.decode(res.accessToken, this.privateKey)
                     this.accessTokenInfo = JSON.parse(this.decode(this.accessToken, this.privateKey))
+                    Auth.bindEvents()
                     console.log(this.accessToken, this.accessTokenInfo)
                 } else {
                     console.log(res)
                 }
             })
+    }
+
+    static async disconnect() {
+        this.request('Disconnect')
+            .then(res => {
+                if (res.disconnected) {
+                    console.log('Disconnection successfull')
+                } else {
+                    console.log('Ann error has occured')
+                }
+            })
+            .catch(err => console.log('Ann error has occured'))
     }
 
     static async request(reqName, params) {
@@ -46,6 +64,13 @@ class Auth {
                 body: JSON.stringify({ request: reqName, ...params })
             })
             .then(data => data.json())
+            .catch(err => console.error(err))
+    }
+
+    static bindEvents() {
+        window.addEventListener('beforeunload', e => {
+            this.disconnect()
+        })
     }
 
     static encode(text, key) {
@@ -82,10 +107,9 @@ class Auth {
         return matchTemplate && validKey
     }
 
-    generatePrivateKey() {
+    static generatePrivateKey() {
         // Must be at least 16 characters long
         const privateKey = this.encode(this.encode(`${window.origin}&${Date.now()}`, this.serverUniqueKey), this.serverUniqueKey)
         return privateKey
     }
-
 }

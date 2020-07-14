@@ -17,19 +17,17 @@ const Logger = require('@dorianb/logger-js')
  *  3) SendInformations
  */
 
-let clients = []
-
 class AuthSystem {
-    static handdleRoute(req, res, next) {
+    static handleRoute(req, res, next) {
         const clientIP = req.header('x-forwarded-for') || req.connection.remoteAddress
 
-        if (AuthClient.exist(clients, clientIP)) {
-            let client = AuthClient.get(clients, clientIP)
+        if (AuthSystem.exist(clientIP)) {
+            let client = AuthSystem.get(clientIP)
             client.handdleRequest(req, res, next)
         } else {
             let client = new AuthClient(req)
             client.handdleRequest(req, res, next)
-            clients.push(client)
+            AuthSystem.addClient(client)
         }
 
         // res.json({
@@ -45,6 +43,35 @@ class AuthSystem {
         // })
         // console.log(Object.keys(req))
     }
+
+    static get(ip) {
+        return this.getClients().find(client => client.ip == ip)
+    }
+
+    static exist(ip) {
+        return this.getClients().filter(client => client.ip == ip).length > 0
+    }
+
+    /* Array of all the clients, even not authenticate ones */
+    static getClients() {
+        if (!this.clients) this.clients = []
+        return this.clients
+    }
+
+    static getAuthenticatedClients() {
+        return AuthSystem.getClients().filter(client => client.isAuthentified)
+    }
+
+    static addClient(client) {
+        AuthSystem.getClients().push(client)
+    }
+
+    static removeClient(client) {
+        if (!this.clients) return
+        client.isAuthentified = false
+        client.privateKey = ''
+        this.clients = this.clients.filter(x => x !== client)
+    }
 }
 
 class AuthClient {
@@ -57,14 +84,6 @@ class AuthClient {
         Logger.setOptions({ filename: 'auth.log' })
     }
 
-    static get(clientsList, ip) {
-        return clientsList.filter(client => client.ip == ip)[0]
-    }
-
-    static exist(clientsList, ip) {
-        return clientsList.filter(client => client.ip == ip).length > 0
-    }
-
     handdleRequest(req, res, next) {
         const request = req.body.request
 
@@ -75,8 +94,8 @@ class AuthClient {
 
         switch (request) {
             case 'RequestUniqueKey':
-                res.send({ uniqueKey: this.uniqueKey })
-                break;
+                res.json({ uniqueKey: this.uniqueKey })
+                break
             case 'SendPrivateKey':
                 this.privateKey = req.body.encode ? this.decode(req.body.privateKey, this.uniqueKey) : req.body.privateKey
                 res.json({
@@ -84,11 +103,19 @@ class AuthClient {
                     success: true,
                     accessToken: this.encode(this.generateToken(), this.privateKey)
                 })
+                Logger.info(`Client ${this.uniqueKey} at [${this.ip}] connected`)
                 this.isAuthentified = true
-                break;
+                break
+            case 'Disconnect':
+                AuthSystem.removeClient(this)
+                res.json({ disconnected: true })
+                Logger.info(`Client ${this.uniqueKey} at [${this.ip}] disconnected`)
+                break
             default:
                 console.log(request)
+                Logger.error(`Unknow request from client ${this.uniqueKey}`)
                 res.json({ error: 'Unknow request' })
+                break
         }
 
     }
@@ -103,7 +130,7 @@ class AuthClient {
             const verificationCode = uniqueKey.charCodeAt(0) + uniqueKey.charCodeAt(1)
             return `${uniqueKey}-${verificationCode}`
         } else {
-            Logger.error('error generateUniqueKey')
+            Logger.error('error generateUniqueKey', 'auth.log')
         }
     }
 
@@ -147,7 +174,4 @@ class AuthClient {
 
 }
 
-module.exports = {
-    AuthSystem,
-    AuthClient
-}
+module.exports = AuthSystem
