@@ -7,6 +7,7 @@ const AUTH_URL = `http://${SERVER_URL}:${PORT}/auth`
 //  - Better library style API :
 //      - Getter & setter
 //      - jsdoc ?
+//      - handler functions
 
 class Auth {
     static async authenticate() {
@@ -25,7 +26,7 @@ class Auth {
                 // Send privateKey
                 this.privateKey = Auth.generatePrivateKey()
                 return this.request('SendPrivateKey', {
-                    encode: 'true',
+                    encode: 'uniqueKey',
                     privateKey: this.encode(this.privateKey, this.serverUniqueKey)
                 })
             })
@@ -43,12 +44,14 @@ class Auth {
     }
 
     static async disconnect() {
+        if (!this.isAuthentified) return
         this.request('Disconnect')
             .then(res => {
                 if (res.disconnected) {
+                    this.isAuthentified = false
                     console.log('Disconnection successfull')
                 } else {
-                    console.log('Ann error has occured')
+                    console.log('An error has occured')
                 }
             })
             .catch(err => console.log('Ann error has occured'))
@@ -112,4 +115,43 @@ class Auth {
         const privateKey = this.encode(this.encode(`${window.origin}&${Date.now()}`, this.serverUniqueKey), this.serverUniqueKey)
         return privateKey
     }
+}
+
+
+async function request(url, method, body) {
+    if (!Auth.isAuthentified) return
+    const secureBody = Auth.encode(JSON.stringify(body), Auth.accessToken)
+
+    return await fetch(url, {
+            method: method,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                encoded: true,
+                content: secureBody
+            })
+        })
+        .then(data => data.text())
+        .catch(err => console.error(err))
+}
+
+function testSecureRequest() {
+    request(`http://${SERVER_URL}:${PORT}`, 'POST', { str: 'oui', int: 1, obj: {} })
+}
+
+function testUnsecureRequest() {
+    fetch(`http://${SERVER_URL}:${PORT}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                content: { str: 'oui', int: 1, obj: {} }
+            })
+        })
+        .then(data => data.text())
+        .catch(err => console.error(err))
 }

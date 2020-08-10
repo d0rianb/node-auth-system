@@ -44,6 +44,21 @@ class AuthSystem {
         // console.log(Object.keys(req))
     }
 
+    static secureRequest(req, res, next) {
+        if (req.url.includes('auth')) next()
+        else if (req.body.encoded && req.body.content) {
+            console.log('encoded request')
+            const clientIP = req.header('x-forwarded-for') || req.connection.remoteAddress
+            if (AuthSystem.exist(clientIP)) {
+                const client = AuthSystem.get(clientIP)
+                req.clearContent = client.decode(req.body.content, client.accessToken)
+                next()
+            }
+        } else {
+            console.log('unsecure request')
+        }
+    }
+
     static get(ip) {
         return this.getClients().find(client => client.ip == ip)
     }
@@ -80,6 +95,7 @@ class AuthClient {
         this.ip = req.header('x-forwarded-for') || req.connection.remoteAddress
         this.uniqueKey = this.generateUniqueKey()
         this.privateKey = ''
+        this.accessToken = ''
         this.isAuthentified = false
         Logger.setOptions({ filename: 'auth.log' })
     }
@@ -88,7 +104,7 @@ class AuthClient {
         const request = req.body.request
 
         if (!request) {
-            Logger.error('Bad query : no request')
+            Logger.error(`Bad query : no request - client ${this.uniqueKey} [${this.ip}]`, 'requests.log')
             res.send({ error: 'Bad query : no request' })
         }
 
@@ -97,27 +113,27 @@ class AuthClient {
                 res.json({ uniqueKey: this.uniqueKey })
                 break
             case 'SendPrivateKey':
-                this.privateKey = req.body.encode ? this.decode(req.body.privateKey, this.uniqueKey) : req.body.privateKey
+                this.privateKey = req.body.encode == 'uniqueKey' ? this.decode(req.body.privateKey, this.uniqueKey) : req.body.privateKey
+                this.accessToken = this.encode(this.generateToken(), this.privateKey)
                 res.json({
                     message: 'Authentification success',
                     success: true,
-                    accessToken: this.encode(this.generateToken(), this.privateKey)
+                    accessToken: this.accessToken
                 })
-                Logger.info(`Client ${this.uniqueKey} at [${this.ip}] connected`)
+                Logger.info(`Client ${this.uniqueKey} at [${this.ip}] connected`, 'client.log')
                 this.isAuthentified = true
                 break
             case 'Disconnect':
                 AuthSystem.removeClient(this)
                 res.json({ disconnected: true })
-                Logger.info(`Client ${this.uniqueKey} at [${this.ip}] disconnected`)
+                Logger.info(`Client ${this.uniqueKey} at [${this.ip}] disconnected`, 'client.log')
                 break
             default:
-                console.log(request)
-                Logger.error(`Unknow request from client ${this.uniqueKey}`)
+                Logger.error(`Unknow request : ${request} from client ${this.uniqueKey} at [${this.ip}]`, 'requests.log')
                 res.json({ error: 'Unknow request' })
                 break
         }
-
+        next()
     }
 
     generateUniqueKey() {
@@ -130,7 +146,7 @@ class AuthClient {
             const verificationCode = uniqueKey.charCodeAt(0) + uniqueKey.charCodeAt(1)
             return `${uniqueKey}-${verificationCode}`
         } else {
-            Logger.error('error generateUniqueKey', 'auth.log')
+            Logger.error('error generateUniqueKey - template is too short')
         }
     }
 

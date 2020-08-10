@@ -18,6 +18,14 @@
     <br />
     <label for="disconnection-button">Cliquez pour vous déconnecter</label>
     <button type="button" name="disconnection-button" onclick="Auth.disconnect()">Déconnection</button>
+    <br />
+    <br />
+    <label for="request-button">Cliquez pour vous envoyer un requête sécurisée</label>
+    <button type="button" name="request-button" onclick="testSecureRequest()">Requête sécurisée</button>
+    <br />
+    <br />
+    <label for="unsecure-request-button">Cliquez pour vous envoyer un requête non sécurisée</label>
+    <button type="button" name="unsecure-request-button" onclick="testUnsecureRequest()">Requête non sécurisée</button>
   </main>
 
   <script src="src/main.js" charset="utf-8" defer></script>
