@@ -2,7 +2,7 @@ const SERVER_URL = '127.0.0.1'
 const PORT = 8081
 
 const AUTH_URL = `http://${SERVER_URL}:${PORT}/auth`
-const TIMEOUT_LIMIT = 1000  // ms
+const TIMEOUT_LIMIT = 1000 // ms
 
 // TODO:
 //  - Better library style API :
@@ -12,7 +12,6 @@ const TIMEOUT_LIMIT = 1000  // ms
 
 class Auth {
     static async authenticate() {
-        console.log('start authentification')
         await this.request('RequestUniqueKey')
             .then(res => {
                 // Receive serverUniqueKey
@@ -20,7 +19,7 @@ class Auth {
                     this.serverUniqueKey = res.uniqueKey
                     return true
                 } else {
-                    console.log('Error with unique key')
+                    throw new ResponseError('Error with unique key')
                 }
             })
             .then(() => {
@@ -39,13 +38,12 @@ class Auth {
                     console.log('connected')
                     Auth.bindEvents()
                 } else {
-                    console.log(res)
+                    throw new ResponseError('Error with the token')
                 }
             })
     }
 
     static async disconnect() {
-        console.log(this.isAuthentified)
         if (!this.isAuthentified) return
         this.request('Disconnect')
             .then(res => {
@@ -53,27 +51,36 @@ class Auth {
                     this.isAuthentified = false
                     console.log('Disconnection successfull')
                 } else {
-                    console.log('An error has occured')
+                    throw new ResponseError('Disconnection error')
                 }
             })
-            .catch(err => console.log('An error has occured'))
+            .catch(err => {
+                throw new ResponseError('Disconnection error')
+            })
     }
 
     static async request(reqName, params) {
-        this.timeout = setTimeout(() => { throw new Error('Timeout') }, TIMEOUT_LIMIT )
+        this.timeout = setTimeout(() => {
+            throw new Error('Timeout')
+        }, TIMEOUT_LIMIT)
         return await fetch(`${AUTH_URL}`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ request: reqName, ...params })
+                body: JSON.stringify({
+                    request: reqName,
+                    ...params
+                })
             })
             .then(data => {
                 clearTimeout(this.timeout)
                 return data.json()
             })
-            .catch(err => console.error(err))
+            .catch(err => {
+                throw new ResponseError(err)
+            })
     }
 
     static bindEvents() {
@@ -123,10 +130,30 @@ class Auth {
     }
 }
 
+class AuthError extends Error {
+    constructor(msg, ...args) {
+        super(msg, ...args)
+    }
+}
+
+class TimeoutError extends Error {
+    constructor(msg, ...args) {
+        super(msg, ...args)
+    }
+}
+
+class ResponseError extends Error {
+    constructor(msg, ...args) {
+        super(msg, ...args)
+    }
+}
 
 async function request(url, method, body) {
-    if (!Auth.isAuthentified) throw new Error('Not authentified')
+    if (!Auth.isAuthentified) throw new AuthError('Not authentified')
     const secureBody = Auth.encode(JSON.stringify(body), Auth.accessToken)
+    timeout = setTimeout(() => {
+        throw new TimeoutError(`Timeout during ${method} request of ${JSON.stringify(body)} to ${url}`)
+    }, TIMEOUT_LIMIT)
     return await fetch(url, {
         method: method,
         headers: {
@@ -138,10 +165,21 @@ async function request(url, method, body) {
             content: secureBody
         })
     })
+    .then(data => {
+            clearTimeout(timeout)
+            return data.json()
+        })
+    .catch(err => {
+        throw new ResponseError(err)
+    })
 }
 
 function testSecureRequest() {
-    request(`http://${SERVER_URL}:${PORT}`, 'POST', { str: 'oui', int: 1, obj: {} })
+    request(`http://${SERVER_URL}:${PORT}`, 'POST', {
+        str: 'oui',
+        int: 1,
+        obj: {}
+    })
 }
 
 function testUnsecureRequest() {
@@ -152,7 +190,11 @@ function testUnsecureRequest() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                content: { str: 'oui', int: 1, obj: {} }
+                content: {
+                    str: 'oui',
+                    int: 1,
+                    obj: {}
+                }
             })
         })
         .then(data => data.text())
