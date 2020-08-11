@@ -1,6 +1,7 @@
 const sha1 = require('sha1')
 const aesjs = require('aes-js')
 const Logger = require('@dorianb/logger-js')
+const { log } = require('@dorianb/logger-js')
 
 /**
  *  1) client send request to get unique key - clear
@@ -23,10 +24,10 @@ class AuthSystem {
 
         if (AuthSystem.exist(clientIP)) {
             let client = AuthSystem.get(clientIP)
-            client.handdleRequest(req, res, next)
+            client.handleAuthRequest(req, res, next)
         } else {
             let client = new AuthClient(req)
-            client.handdleRequest(req, res, next)
+            client.handleAuthRequest(req, res, next)
             AuthSystem.addClient(client)
         }
 
@@ -45,17 +46,20 @@ class AuthSystem {
     }
 
     static secureRequest(req, res, next) {
-        if (req.url.includes('auth')) next()
+        if (req.url.includes('auth')) {
+            next()
+        }
         else if (req.body.encoded && req.body.content) {
-            console.log('encoded request')
             const clientIP = req.header('x-forwarded-for') || req.connection.remoteAddress
             if (AuthSystem.exist(clientIP)) {
                 const client = AuthSystem.get(clientIP)
+                Logger.info(`Receive encrypted request from client ${client.privateKey} [${client.ip}]`, 'requests.log')
                 req.clearContent = client.decode(req.body.content, client.accessToken)
+                AuthSystem.onRequest(req, client)
                 next()
             }
         } else {
-            console.log('unsecure request')
+            Logger.info(`Receive an unsecure request from ${req.connection.remoteAddress}`, 'requests.log')
         }
     }
 
@@ -87,6 +91,31 @@ class AuthSystem {
         client.privateKey = ''
         this.clients = this.clients.filter(x => x !== client)
     }
+
+    static on(event, callback) {
+        if (typeof callback !== 'function') {
+            throw new Error('Callback should be a function')
+        }
+        switch (event) {
+            case 'clientConnected':
+                AuthSystem.onClientConnected = callback
+                break
+            case 'clientDisconnected':
+                AuthSystem.onClientDisconnected = callback
+                break
+            case 'request':
+                AuthSystem.onRequest = callback
+                break
+            default:
+                throw new Error('Unknown event : ' + event)
+        }
+    }
+
+    static onClientConnected(client) {}
+
+    static onClientDisconnected(client) {}
+
+    static onRequest(request, client) {}
 }
 
 class AuthClient {
@@ -100,7 +129,7 @@ class AuthClient {
         Logger.setOptions({ filename: 'auth.log' })
     }
 
-    handdleRequest(req, res, next) {
+    handleAuthRequest(req, res, next) {
         const request = req.body.request
 
         if (!request) {
@@ -114,19 +143,22 @@ class AuthClient {
                 break
             case 'SendPrivateKey':
                 this.privateKey = req.body.encode == 'uniqueKey' ? this.decode(req.body.privateKey, this.uniqueKey) : req.body.privateKey
-                this.accessToken = this.encode(this.generateToken(), this.privateKey)
+                this.accessToken = this.generateToken()
                 res.json({
                     message: 'Authentification success',
                     success: true,
-                    accessToken: this.accessToken
+                    accessToken: this.encode(this.accessToken, this.privateKey)
                 })
                 Logger.info(`Client ${this.uniqueKey} at [${this.ip}] connected`, 'client.log')
                 this.isAuthentified = true
+                AuthSystem.onClientConnected(this)
                 break
             case 'Disconnect':
                 AuthSystem.removeClient(this)
                 res.json({ disconnected: true })
+                this.isAuthentified = false
                 Logger.info(`Client ${this.uniqueKey} at [${this.ip}] disconnected`, 'client.log')
+                AuthSystem.onClientDisconnected(this)
                 break
             default:
                 Logger.error(`Unknow request : ${request} from client ${this.uniqueKey} at [${this.ip}]`, 'requests.log')

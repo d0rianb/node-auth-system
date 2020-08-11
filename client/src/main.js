@@ -2,6 +2,7 @@ const SERVER_URL = '127.0.0.1'
 const PORT = 8081
 
 const AUTH_URL = `http://${SERVER_URL}:${PORT}/auth`
+const TIMEOUT_LIMIT = 1000  // ms
 
 // TODO:
 //  - Better library style API :
@@ -11,12 +12,12 @@ const AUTH_URL = `http://${SERVER_URL}:${PORT}/auth`
 
 class Auth {
     static async authenticate() {
+        console.log('start authentification')
         await this.request('RequestUniqueKey')
             .then(res => {
                 // Receive serverUniqueKey
                 if (res.uniqueKey && this.isValidKey(res.uniqueKey)) {
                     this.serverUniqueKey = res.uniqueKey
-                    console.log('Receive valid uniqueKey :', this.serverUniqueKey)
                     return true
                 } else {
                     console.log('Error with unique key')
@@ -35,8 +36,8 @@ class Auth {
                     this.isAuthentified = true
                     this.accessToken = this.decode(res.accessToken, this.privateKey)
                     this.accessTokenInfo = JSON.parse(this.decode(this.accessToken, this.privateKey))
+                    console.log('connected')
                     Auth.bindEvents()
-                    console.log(this.accessToken, this.accessTokenInfo)
                 } else {
                     console.log(res)
                 }
@@ -44,6 +45,7 @@ class Auth {
     }
 
     static async disconnect() {
+        console.log(this.isAuthentified)
         if (!this.isAuthentified) return
         this.request('Disconnect')
             .then(res => {
@@ -54,10 +56,11 @@ class Auth {
                     console.log('An error has occured')
                 }
             })
-            .catch(err => console.log('Ann error has occured'))
+            .catch(err => console.log('An error has occured'))
     }
 
     static async request(reqName, params) {
+        this.timeout = setTimeout(() => { throw new Error('Timeout') }, TIMEOUT_LIMIT )
         return await fetch(`${AUTH_URL}`, {
                 method: 'POST',
                 headers: {
@@ -66,7 +69,10 @@ class Auth {
                 },
                 body: JSON.stringify({ request: reqName, ...params })
             })
-            .then(data => data.json())
+            .then(data => {
+                clearTimeout(this.timeout)
+                return data.json()
+            })
             .catch(err => console.error(err))
     }
 
@@ -119,22 +125,19 @@ class Auth {
 
 
 async function request(url, method, body) {
-    if (!Auth.isAuthentified) return
+    if (!Auth.isAuthentified) throw new Error('Not authentified')
     const secureBody = Auth.encode(JSON.stringify(body), Auth.accessToken)
-
     return await fetch(url, {
-            method: method,
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                encoded: true,
-                content: secureBody
-            })
+        method: method,
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            encoded: true,
+            content: secureBody
         })
-        .then(data => data.text())
-        .catch(err => console.error(err))
+    })
 }
 
 function testSecureRequest() {
