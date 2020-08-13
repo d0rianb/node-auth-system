@@ -1,7 +1,6 @@
 const sha1 = require('sha1')
 const aesjs = require('aes-js')
 const Logger = require('@dorianb/logger-js')
-const { log } = require('@dorianb/logger-js')
 
 /**
  *  1) client send request to get unique key - clear
@@ -48,8 +47,7 @@ class AuthSystem {
     static secureRequest(req, res, next) {
         if (req.url.includes('auth')) {
             next()
-        }
-        else if (req.body.encoded && req.body.content) {
+        } else if (req.body.encoded && req.body.content) {
             const clientIP = req.header('x-forwarded-for') || req.connection.remoteAddress
             if (AuthSystem.exist(clientIP)) {
                 const client = AuthSystem.get(clientIP)
@@ -68,7 +66,7 @@ class AuthSystem {
     }
 
     static exist(ip) {
-        return this.getClients().filter(client => client.ip == ip).length > 0
+        return !!this.get(ip)
     }
 
     /* Array of all the clients, even not authenticate ones */
@@ -142,7 +140,7 @@ class AuthClient {
                 res.json({ uniqueKey: this.uniqueKey })
                 break
             case 'SendPrivateKey':
-                this.privateKey = req.body.encode == 'uniqueKey' ? this.decode(req.body.privateKey, this.uniqueKey) : req.body.privateKey
+                this.privateKey = this.decode(req.body.privateKey, this.uniqueKey)
                 this.accessToken = this.generateToken()
                 res.json({
                     message: 'Authentification success',
@@ -156,7 +154,6 @@ class AuthClient {
             case 'Disconnect':
                 AuthSystem.removeClient(this)
                 res.json({ disconnected: true })
-                this.isAuthentified = false
                 Logger.info(`Client ${this.uniqueKey} at [${this.ip}] disconnected`, 'client.log')
                 AuthSystem.onClientDisconnected(this)
                 break
@@ -199,7 +196,7 @@ class AuthClient {
             Logger.warn(`Encode error: key ${key} is too short`)
             key += new Array(16 - key.length).fill(0).join('')
         }
-        let byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
+        const byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
         const textBytes = aesjs.utils.utf8.toBytes(text)
         const aesCtr = new aesjs.ModeOfOperation.ctr(byteKey, new aesjs.Counter(5))
         const encryptedBytes = aesCtr.encrypt(textBytes)

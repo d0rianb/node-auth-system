@@ -2,7 +2,10 @@ const SERVER_URL = '127.0.0.1'
 const PORT = 8081
 
 const AUTH_URL = `http://${SERVER_URL}:${PORT}/auth`
+
 const TIMEOUT_LIMIT = 1000 // ms
+const TIMEOUT_REQUESTS = true
+
 
 // TODO:
 //  - Better library style API :
@@ -61,7 +64,7 @@ class Auth {
 
     static async request(reqName, params) {
         this.timeout = setTimeout(() => {
-            throw new Error('Timeout')
+            if (TIMEOUT_REQUESTS) throw new Error('Timeout')
         }, TIMEOUT_LIMIT)
         return await fetch(`${AUTH_URL}`, {
                 method: 'POST',
@@ -107,7 +110,7 @@ class Auth {
             console.log(`Decode error: key ${key} is too short`)
             key += new Array(16 - key.length).fill(0).join('')
         }
-        let byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
+        const byteKey = aesjs.utils.utf8.toBytes(key).slice(0, 16)
         const encryptedBytes = aesjs.utils.hex.toBytes(encodeText)
         const aesCtr = new aesjs.ModeOfOperation.ctr(byteKey, new aesjs.Counter(5))
         const decryptedBytes = aesCtr.decrypt(encryptedBytes)
@@ -152,26 +155,26 @@ async function request(url, method, body) {
     if (!Auth.isAuthentified) throw new AuthError('Not authentified')
     const secureBody = Auth.encode(JSON.stringify(body), Auth.accessToken)
     timeout = setTimeout(() => {
-        throw new TimeoutError(`Timeout during ${method} request of ${JSON.stringify(body)} to ${url}`)
+        if (TIMEOUT_REQUESTS) throw new TimeoutError(`Timeout during ${method} request of ${JSON.stringify(body)} to ${url}`)
     }, TIMEOUT_LIMIT)
     return await fetch(url, {
-        method: method,
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            encoded: true,
-            content: secureBody
+            method: method,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                encoded: true,
+                content: secureBody
+            })
         })
-    })
-    .then(data => {
+        .then(data => {
             clearTimeout(timeout)
             return data.json()
         })
-    .catch(err => {
-        throw new ResponseError(err)
-    })
+        .catch(err => {
+            throw new ResponseError(err)
+        })
 }
 
 function testSecureRequest() {
